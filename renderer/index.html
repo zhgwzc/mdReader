@@ -13,8 +13,11 @@
       <div id="tabs"></div>
     </div>
 
-    <!-- Toolbar: Edit/Preview on the right -->
+    <!-- Toolbar: outline toggle on left, Edit/Preview on right -->
     <div id="toolbar">
+      <div id="toolbar-left">
+        <button id="btn-outline" class="toolbar-btn" style="display:none" title="Toggle outline">☰</button>
+      </div>
       <div id="toolbar-spacer"></div>
       <div id="toolbar-right">
         <button id="btn-edit" class="toolbar-btn active">Edit</button>
@@ -24,6 +27,7 @@
 
     <!-- Content area -->
     <div id="content-area">
+      <div id="outline-sidebar"></div>
       <div id="editor-views"></div>
       <div id="preview-views"></div>
     </div>
@@ -34,6 +38,18 @@
       <span id="zoom-label" class="zoom-label">100%</span>
       <button id="btn-zoom-reset" class="toolbar-btn icon-btn" title="Reset zoom">⟳</button>
       <button id="btn-zoom-in" class="toolbar-btn icon-btn" title="Zoom in">+</button>
+    </div>
+
+    <!-- Unsaved changes confirmation dialog -->
+    <div id="confirm-dialog" class="modal-overlay" style="display:none;">
+      <div class="modal-box">
+        <p id="confirm-message"></p>
+        <div class="modal-buttons">
+          <button id="btn-dont-save" class="modal-btn btn-secondary">不保存</button>
+          <button id="btn-cancel-confirm" class="modal-btn btn-secondary">取消</button>
+          <button id="btn-save-confirm" class="modal-btn btn-primary">保存</button>
+        </div>
+      </div>
     </div>
 
     <!-- Tab context menu -->

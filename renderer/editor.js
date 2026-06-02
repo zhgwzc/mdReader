@@ -12,6 +12,7 @@ const TurndownService = require('turndown');
 const path = require('path');
 const { webUtils, ipcRenderer } = require('electron');
 const fs = require('fs');
+const { readFileAuto } = require('../encoding');
 
 const md = markdownit({ html: true, linkify: true, typographer: true, breaks: true });
 const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
@@ -27,6 +28,7 @@ let zoomLevel = 100;
 let tabIdCounter = 0;
 let currentView = 'edit';
 let contextMenuTabId = null;
+let outlineVisible = false;
 
 // ========== Helpers ==========
 function wrapSelection(wrapper) {
@@ -70,6 +72,11 @@ function prefixLine(prefix) {
 
 // ========== Tab management ==========
 function addTab(filePath, content) {
+  // 已打开的文件直接切换，不重复创建标签
+  if (filePath) {
+    const existing = tabs.find(t => t.filePath === filePath);
+    if (existing) { switchTab(existing.id); return existing; }
+  }
   const id = ++tabIdCounter;
 
   const editorViews = document.getElementById('editor-views');
@@ -95,7 +102,6 @@ function addTab(filePath, content) {
   };
 
   tabs.push(tab);
-  createEditorForTab(tab);
   pvContent.innerHTML = md.render(content || '');
   addTabButton(tab);
   switchTab(id);
@@ -191,18 +197,67 @@ function switchTab(id) {
   if (!tab) return;
 
   activeTabId = id;
+
+  // 空内容标签强制切到编辑模式，避免空 preview 无法交互
+  const contentEmpty = !tab.editor || tab.editor.state.doc.toString().trim() === '';
+  if (contentEmpty && currentView === 'preview') {
+    showView('edit');
+  }
+
+  if (outlineVisible) rebuildOutline();
   if (tab._btn) tab._btn.classList.add('active');
   showViewInternal(currentView, tab);
+
+  if (!tab.editor) {
+    createEditorForTab(tab);
+  }
 
   if (currentView === 'edit' && tab.editor) {
     setTimeout(() => tab.editor.focus(), 0);
   }
 }
 
-function closeTab(id) {
+function showConfirmDialog(tabName) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('confirm-dialog');
+    document.getElementById('confirm-message').textContent = `是否保存对"${tabName}"的修改？`;
+
+    const onDontSave = () => { cleanup(); resolve('dontsave'); };
+    const onCancel = () => { cleanup(); resolve('cancel'); };
+    const onSave = () => { cleanup(); resolve('save'); };
+
+    function cleanup() {
+      overlay.style.display = 'none';
+      document.getElementById('btn-dont-save').removeEventListener('click', onDontSave);
+      document.getElementById('btn-cancel-confirm').removeEventListener('click', onCancel);
+      document.getElementById('btn-save-confirm').removeEventListener('click', onSave);
+    }
+
+    document.getElementById('btn-dont-save').addEventListener('click', onDontSave);
+    document.getElementById('btn-cancel-confirm').addEventListener('click', onCancel);
+    document.getElementById('btn-save-confirm').addEventListener('click', onSave);
+
+    overlay.style.display = 'flex';
+  });
+}
+
+async function closeTab(id) {
   const idx = tabs.findIndex(t => t.id === id);
   if (idx === -1) return;
   const tab = tabs[idx];
+
+  if (tab.isModified) {
+    const result = await showConfirmDialog(getTabName(tab));
+    if (result === 'cancel') return;
+    if (result === 'save') {
+      if (tab.filePath && tab.editor) {
+        const content = tab.editor.state.doc.toString();
+        await ipcRenderer.invoke('save-tab-content', tab.filePath, content);
+        tab.isModified = false;
+      }
+      // 无 filePath 时无法保存，继续关闭（等同不保存）
+    }
+  }
 
   if (tab.edDiv) tab.edDiv.remove();
   if (tab.pvDiv) tab.pvDiv.remove();
@@ -274,11 +329,35 @@ async function handleContextAction(action) {
   hideContextMenu();
 }
 
+// ========== Outline ==========
+function rebuildOutline() {
+  const sidebar = document.getElementById("outline-sidebar");
+  if (!sidebar) return;
+  sidebar.innerHTML = "";
+  const tab = getActiveTab();
+  if (!tab || !tab.pvContent) return;
+  const headings = tab.pvContent.querySelectorAll("h1, h2, h3, h4, h5, h6");
+  headings.forEach((h, idx) => {
+    const id = h.id || ("outline-" + idx);
+    if (!h.id) h.id = id;
+    const item = document.createElement("div");
+    item.className = "outline-item outline-" + h.tagName.toLowerCase();
+    item.textContent = h.textContent;
+    item.addEventListener("click", () => {
+      h.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.querySelectorAll(".outline-item").forEach(el => el.classList.remove("active"));
+      item.classList.add("active");
+    });
+    sidebar.appendChild(item);
+  });
+}
+
 // ========== Preview sync ==========
 function syncPreviewForTab(tab) {
   if (isInternalUpdate) return;
   if (!tab.editor) return;
   tab.pvContent.innerHTML = md.render(tab.editor.state.doc.toString());
+  if (outlineVisible) rebuildOutline();
 }
 
 function syncFromPreview() {
@@ -304,6 +383,7 @@ function showViewInternal(viewName, tab) {
   } else {
     if (tab.editor) {
       tab.pvContent.innerHTML = md.render(tab.editor.state.doc.toString());
+  if (outlineVisible) rebuildOutline();
     }
     if (tab.edDiv) tab.edDiv.classList.remove('active');
     if (tab.pvDiv) tab.pvDiv.classList.add('active');
@@ -312,8 +392,21 @@ function showViewInternal(viewName, tab) {
 
 function showView(viewName) {
   currentView = viewName;
-  document.getElementById('btn-edit').classList.toggle('active', viewName === 'edit');
-  document.getElementById('btn-preview').classList.toggle('active', viewName === 'preview');
+  document.getElementById("btn-edit").classList.toggle("active", viewName === "edit");
+  document.getElementById("btn-preview").classList.toggle("active", viewName === "preview");
+  const btnOutline = document.getElementById("btn-outline");
+  const outlineSidebar = document.getElementById("outline-sidebar");
+  const contentArea = document.getElementById("content-area");
+  if (viewName === "preview") {
+    btnOutline.style.display = "";
+    if (outlineVisible) rebuildOutline();
+  } else {
+    btnOutline.style.display = "none";
+    outlineSidebar.classList.remove("visible");
+    btnOutline.classList.remove("active");
+    contentArea.classList.remove("outline-open");
+    outlineVisible = false;
+  }
   const tab = getActiveTab();
   if (tab) showViewInternal(viewName, tab);
 }
@@ -362,6 +455,9 @@ window.getEditorContent = () => {
 };
 
 window.addTabFromMain = (filePath, content) => {
+  const bytes = new Uint8Array(content.length);
+  for (let i = 0; i < content.length; i++) bytes[i] = content.charCodeAt(i);
+  content = new TextDecoder("utf-8").decode(bytes);
   const existing = tabs.find(t => t.filePath === filePath);
   if (existing) { switchTab(existing.id); return; }
   addTab(filePath, content);
@@ -387,7 +483,8 @@ window.markActiveSaved = (filePath) => {
 };
 
 // ========== Drag & drop ==========
-document.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); });
+// 捕获阶段拦截，防止 contentEditable 预览区先处理 drop 导致内容被插入当前文档
+document.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); }, true);
 document.addEventListener('drop', async (e) => {
   e.preventDefault(); e.stopPropagation();
   const files = e.dataTransfer.files;
@@ -395,10 +492,10 @@ document.addEventListener('drop', async (e) => {
     const file = files[i];
     if (!file.name.endsWith('.md')) continue;
     const filePath = webUtils.getPathForFile(file);
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = readFileAuto(filePath);
     addTab(filePath, content);
   }
-});
+}, true);
 
 // ========== Init ==========
 document.addEventListener('DOMContentLoaded', () => {
@@ -418,6 +515,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#tab-context-menu')) hideContextMenu();
+  });
+
+  // ========== Outline ==========
+  const outlineSidebar = document.getElementById("outline-sidebar");
+  const btnOutline = document.getElementById("btn-outline");
+  btnOutline.style.display = "none";
+
+  const contentArea = document.getElementById("content-area");
+
+  btnOutline.addEventListener("click", () => {
+    outlineVisible = !outlineVisible;
+    if (outlineVisible) {
+      outlineSidebar.classList.add("visible");
+      btnOutline.classList.add("active");
+      contentArea.classList.add("outline-open");
+      rebuildOutline();
+    } else {
+      outlineSidebar.classList.remove("visible");
+      btnOutline.classList.remove("active");
+      contentArea.classList.remove("outline-open");
+    }
   });
 
   addTab(null, '');

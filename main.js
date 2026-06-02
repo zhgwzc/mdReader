@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { readFileAuto } = require('./encoding');
 
 app.setName('MD阅读器');
 
@@ -44,7 +45,7 @@ async function openFile() {
   if (canceled || filePaths.length === 0) return;
 
   for (const filePath of filePaths) {
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = readFileAuto(filePath);
     const b64 = Buffer.from(content, 'utf-8').toString('base64');
     await mainWindow.webContents.executeJavaScript(
       `window.addTabFromMain("${filePath.replace(/\\/g, '\\\\')}", atob("${b64}"))`
@@ -156,7 +157,7 @@ function openFilePath(filePath) {
     });
     return;
   }
-  const content = fs.readFileSync(filePath, 'utf-8');
+  const content = readFileAuto(filePath);
   const b64 = Buffer.from(content, 'utf-8').toString('base64');
   mainWindow.webContents.executeJavaScript(
     `window.addTabFromMain("${filePath.replace(/\\/g, '\\\\')}", atob("${b64}"))`

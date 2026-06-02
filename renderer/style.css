@@ -173,15 +173,20 @@ html, body {
 
 /* ========== Editor containers ========== */
 .editor-container {
-  display: none;
+  visibility: hidden;
+  pointer-events: none;
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  display: flex;
 }
 
-.editor-container.active { display: flex; }
+.editor-container.active {
+  visibility: visible;
+  pointer-events: auto;
+}
 
 .editor-container .cm-editor {
   flex: 1;
@@ -189,7 +194,7 @@ html, body {
 }
 
 .editor-container .cm-editor .cm-scroller {
-  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "PingFang SC", "Microsoft YaHei", monospace;
   font-size: 15px;
   line-height: 1.7;
 }
@@ -200,17 +205,20 @@ html, body {
 
 /* ========== Preview containers ========== */
 .preview-container {
-  display: none;
+  visibility: hidden;
+  pointer-events: none;
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   overflow-y: auto;
+  display: block;
 }
 
 .preview-container.active {
-  display: block;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .preview-container .markdown-body {
@@ -329,7 +337,7 @@ html, body {
 #zoom-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 6px;
   padding: 4px 12px;
   background: #f8f9fa;
@@ -350,3 +358,126 @@ html, body {
 ::-webkit-scrollbar-track { background: #f8f9fa; }
 ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+/* ========== Toolbar left ========== */
+#toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* offset preview when outline is open */
+#content-area.outline-open .preview-container.active {
+  left: 240px;
+}
+
+/* ========== Outline Sidebar (Preview only, overlay) ========== */
+#outline-sidebar {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 240px;
+  background: #fafafa;
+  border-right: 1px solid #e0e0e0;
+  overflow-y: auto;
+  z-index: 10;
+  padding: 12px 0;
+}
+
+#outline-sidebar.visible {
+  display: block;
+}
+
+.outline-item {
+  display: block;
+  padding: 4px 16px;
+  font-size: 13px;
+  color: #555;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.6;
+  border-left: 3px solid transparent;
+  transition: all 0.12s;
+}
+
+.outline-item:hover {
+  background: #e8e8e8;
+  color: #222;
+}
+
+.outline-item.active {
+  border-left-color: #007aff;
+  color: #007aff;
+  background: #eef4ff;
+}
+
+/* ========== Modal dialog ========== */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  padding: 24px;
+  min-width: 360px;
+  max-width: 420px;
+}
+
+.modal-box p {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 20px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.modal-btn {
+  padding: 7px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #d0d0d0;
+  transition: all 0.15s;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #555;
+}
+
+.btn-secondary:hover { background: #f0f0f0; }
+
+.btn-primary {
+  background: #007aff;
+  color: #fff;
+  border-color: #007aff;
+}
+
+.btn-primary:hover { background: #0066d6; }
+
+.outline-item.outline-h1 { padding-left: 16px; font-weight: 700; font-size: 14px; }
+.outline-item.outline-h2 { padding-left: 28px; font-weight: 600; }
+.outline-item.outline-h3 { padding-left: 40px; }
+.outline-item.outline-h4 { padding-left: 52px; font-size: 12px; color: #888; }
+.outline-item.outline-h5 { padding-left: 64px; font-size: 12px; color: #999; }
+.outline-item.outline-h6 { padding-left: 76px; font-size: 12px; color: #aaa; }
