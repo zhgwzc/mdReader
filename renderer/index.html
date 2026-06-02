@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD 阅读器</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Tab bar -->
+    <div id="tab-bar">
+      <div id="tabs"></div>
+    </div>
+
+    <!-- Toolbar: Edit/Preview on the right -->
+    <div id="toolbar">
+      <div id="toolbar-spacer"></div>
+      <div id="toolbar-right">
+        <button id="btn-edit" class="toolbar-btn active">Edit</button>
+        <button id="btn-preview" class="toolbar-btn">Preview</button>
+      </div>
+    </div>
+
+    <!-- Content area -->
+    <div id="content-area">
+      <div id="editor-views"></div>
+      <div id="preview-views"></div>
+    </div>
+
+    <!-- Zoom bar at bottom -->
+    <div id="zoom-bar">
+      <button id="btn-zoom-out" class="toolbar-btn icon-btn" title="Zoom out">−</button>
+      <span id="zoom-label" class="zoom-label">100%</span>
+      <button id="btn-zoom-reset" class="toolbar-btn icon-btn" title="Reset zoom">⟳</button>
+      <button id="btn-zoom-in" class="toolbar-btn icon-btn" title="Zoom in">+</button>
+    </div>
+
+    <!-- Tab context menu -->
+    <div id="tab-context-menu" class="context-menu" style="display:none;">
+      <div class="context-item" data-action="close">Close</div>
+      <div class="context-item" data-action="save">Save</div>
+      <div class="context-item" data-action="reveal">Show in Finder</div>
+    </div>
+  </div>
+
+  <script src="editor.js"></script>
+</body>
+</html>
