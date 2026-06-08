@@ -26,7 +26,7 @@ let activeTabId = null;
 let isInternalUpdate = false;
 let zoomLevel = 100;
 let tabIdCounter = 0;
-let currentView = 'edit';
+let currentView = 'preview';
 let contextMenuTabId = null;
 let outlineVisible = false;
 
@@ -104,6 +104,23 @@ function addTab(filePath, content) {
   tabs.push(tab);
   pvContent.innerHTML = md.render(content || '');
   addTabButton(tab);
+
+  // 打开文件时默认 preview + 显示大纲
+  if (filePath) {
+    if (currentView !== 'preview') {
+      currentView = 'preview';
+      document.getElementById("btn-edit").classList.remove("active");
+      document.getElementById("btn-preview").classList.add("active");
+      document.getElementById("btn-outline").style.display = "";
+    }
+    if (!outlineVisible) {
+      outlineVisible = true;
+      document.getElementById("outline-sidebar").classList.add("visible");
+      document.getElementById("btn-outline").classList.add("active");
+      document.getElementById("content-area").classList.add("outline-open");
+    }
+  }
+
   switchTab(id);
 
   return tab;
@@ -199,8 +216,8 @@ function switchTab(id) {
   activeTabId = id;
 
   // 空内容标签强制切到编辑模式，避免空 preview 无法交互
-  const contentEmpty = !tab.editor || tab.editor.state.doc.toString().trim() === '';
-  if (contentEmpty && currentView === 'preview') {
+  const hasContent = (tab.editor && tab.editor.state.doc.toString().trim() !== '') || (tab._content && tab._content.trim() !== '');
+  if (!hasContent && currentView === 'preview') {
     showView('edit');
   }
 
@@ -360,6 +377,20 @@ function syncPreviewForTab(tab) {
   if (outlineVisible) rebuildOutline();
 }
 
+function saveScrollRatio(tab) {
+  if (!tab) return 0;
+  if (tab.pvDiv && tab.pvDiv.classList.contains('active')) {
+    const maxScroll = tab.pvDiv.scrollHeight - tab.pvDiv.clientHeight;
+    return maxScroll > 0 ? tab.pvDiv.scrollTop / maxScroll : 0;
+  }
+  if (tab.editor) {
+    const es = tab.editor.scrollDOM;
+    const maxScroll = es.scrollHeight - es.clientHeight;
+    return maxScroll > 0 ? es.scrollTop / maxScroll : 0;
+  }
+  return 0;
+}
+
 function syncFromPreview() {
   if (isInternalUpdate) return;
   const tab = getActiveTab();
@@ -391,6 +422,9 @@ function showViewInternal(viewName, tab) {
 }
 
 function showView(viewName) {
+  const tab = getActiveTab();
+  const scrollRatio = saveScrollRatio(tab);
+
   currentView = viewName;
   document.getElementById("btn-edit").classList.toggle("active", viewName === "edit");
   document.getElementById("btn-preview").classList.toggle("active", viewName === "preview");
@@ -399,16 +433,32 @@ function showView(viewName) {
   const contentArea = document.getElementById("content-area");
   if (viewName === "preview") {
     btnOutline.style.display = "";
-    if (outlineVisible) rebuildOutline();
+    if (outlineVisible) {
+      outlineSidebar.classList.add("visible");
+      btnOutline.classList.add("active");
+      contentArea.classList.add("outline-open");
+      rebuildOutline();
+    }
   } else {
     btnOutline.style.display = "none";
     outlineSidebar.classList.remove("visible");
     btnOutline.classList.remove("active");
     contentArea.classList.remove("outline-open");
-    outlineVisible = false;
   }
-  const tab = getActiveTab();
-  if (tab) showViewInternal(viewName, tab);
+  if (tab) {
+    showViewInternal(viewName, tab);
+    requestAnimationFrame(() => {
+      if (viewName === 'edit' && tab.editor) {
+        const es = tab.editor.scrollDOM;
+        const maxScroll = es.scrollHeight - es.clientHeight;
+        es.scrollTop = scrollRatio * maxScroll;
+        tab.editor.focus();
+      } else if (viewName === 'preview' && tab.pvDiv) {
+        const maxScroll = tab.pvDiv.scrollHeight - tab.pvDiv.clientHeight;
+        tab.pvDiv.scrollTop = scrollRatio * maxScroll;
+      }
+    });
+  }
 }
 
 // ========== Preview Enter in code blocks ==========
